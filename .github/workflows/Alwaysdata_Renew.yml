@@ -55,16 +55,19 @@ jobs:
 
       - name: 🔄 自动改写工作流文件并推送到仓库
         if: success()
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
         run: |
           set -e
           NEW_CRON="${{ steps.generate_cron.outputs.NEW_CRON }}"
-          # ── 修复：使用 GITHUB_WORKSPACE 获取当前工作流文件的绝对路径 ──
           WORKFLOW_FILE="${GITHUB_WORKSPACE}/.github/workflows/Alwaysdata_Renew.yml"
+
+          # 调试：确认 token 是否正确注入
+          echo "::notice::TOKEN 前8位: ${REPO_TOKEN:0:8}"
 
           # 确认文件存在
           if [ ! -f "$WORKFLOW_FILE" ]; then
             echo "::error::找不到工作流文件: $WORKFLOW_FILE"
-            echo "::error::当前目录内容："
             ls -la "${GITHUB_WORKSPACE}/.github/workflows/" || true
             exit 1
           fi
@@ -84,10 +87,10 @@ jobs:
             exit 0
           fi
 
-          # 提交并推送（直接在 checkout 的仓库中操作，无需二次 clone）
+          # 使用环境变量方式注入 token，避免 shell 转义问题
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${{ secrets.REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "https://x-access-token:${REPO_TOKEN}@github.com/${{ github.repository }}.git"
           git add "$WORKFLOW_FILE"
           git commit -m "🔄 自动打乱排期：更新下月 Alwaysdata 随机 Cron" \
                    -m "新排期表达式: $NEW_CRON"
